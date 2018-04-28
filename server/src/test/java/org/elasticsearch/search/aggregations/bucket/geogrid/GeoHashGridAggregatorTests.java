@@ -27,6 +27,7 @@ import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.store.Directory;
 import org.elasticsearch.common.CheckedConsumer;
+import org.elasticsearch.common.geo.GeoHashUtils;
 import org.elasticsearch.index.mapper.GeoPointFieldMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.search.aggregations.Aggregator;
@@ -97,8 +98,51 @@ public class GeoHashGridAggregatorTests extends AggregatorTestCase {
         });
     }
 
-    private void testCase(Query query, String field, int precision, CheckedConsumer<RandomIndexWriter, IOException> buildIndex,
-                          Consumer<InternalGeoHashGrid> verify) throws IOException {
+    public void testWithSeveralDocsPlusCode() throws IOException {
+        int tmp = randomIntBetween(4, 12);
+        if (tmp < 8 && tmp % 2 == 1) tmp++;
+        final int precision = tmp;
+
+        int numPoints = randomIntBetween(8, 128);
+        Map<String, Integer> expectedCountPerGeoHash = new HashMap<>();
+        testCase(new MatchAllDocsQuery(), FIELD_NAME, GeoHashType.pluscode, precision, iw -> {
+            List<LatLonDocValuesField> points = new ArrayList<>();
+            Set<String> distinctHashesPerDoc = new HashSet<>();
+            for (int pointId = 0; pointId < numPoints; pointId++) {
+                double lat = (180d * randomDouble()) - 90d;
+                double lng = (360d * randomDouble()) - 180d;
+                points.add(new LatLonDocValuesField(FIELD_NAME, lat, lng));
+                String hash = GeoHashUtils.latLngToPluscode(lng, lat, precision);
+                if (distinctHashesPerDoc.contains(hash) == false) {
+                    expectedCountPerGeoHash.put(hash, expectedCountPerGeoHash.getOrDefault(hash, 0) + 1);
+                }
+                distinctHashesPerDoc.add(hash);
+                if (usually()) {
+                    iw.addDocument(points);
+                    points.clear();
+                    distinctHashesPerDoc.clear();
+                }
+            }
+            if (points.size() != 0) {
+                iw.addDocument(points);
+            }
+        }, geoHashGrid -> {
+            assertEquals(expectedCountPerGeoHash.size(), geoHashGrid.getBuckets().size());
+            for (GeoHashGrid.Bucket bucket : geoHashGrid.getBuckets()) {
+                assertEquals((long) expectedCountPerGeoHash.get(bucket.getKeyAsString()), bucket.getDocCount());
+            }
+        });
+    }
+
+    private void testCase(Query query, String field, int precision, CheckedConsumer<RandomIndexWriter,
+        IOException> buildIndex, Consumer<InternalGeoHashGrid> verify) throws IOException {
+
+        testCase(query, field, GeoHashType.geohash, precision, buildIndex, verify);
+    }
+
+    private void testCase(Query query, String field, GeoHashType type, int precision, CheckedConsumer<RandomIndexWriter,
+        IOException> buildIndex, Consumer<InternalGeoHashGrid> verify) throws IOException
+    {
         Directory directory = newDirectory();
         RandomIndexWriter indexWriter = new RandomIndexWriter(random(), directory);
         buildIndex.accept(indexWriter);
@@ -108,6 +152,7 @@ public class GeoHashGridAggregatorTests extends AggregatorTestCase {
         IndexSearcher indexSearcher = newSearcher(indexReader, true, true);
 
         GeoGridAggregationBuilder aggregationBuilder = new GeoGridAggregationBuilder("_name").field(field);
+        aggregationBuilder.type(type.name());
         aggregationBuilder.precision(precision);
         MappedFieldType fieldType = new GeoPointFieldMapper.GeoPointFieldType();
         fieldType.setHasDocValues(true);

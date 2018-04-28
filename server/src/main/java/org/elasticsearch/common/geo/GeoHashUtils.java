@@ -18,6 +18,7 @@
  */
 package org.elasticsearch.common.geo;
 
+import com.google.openlocationcode.OpenLocationCode;
 import org.apache.lucene.geo.Rectangle;
 import org.apache.lucene.spatial.util.MortonEncoder;
 import org.apache.lucene.util.BitUtil;
@@ -351,4 +352,80 @@ public class GeoHashUtils {
     public static final double decodeLongitude(final String geohash) {
         return decodeLongitude(mortonEncode(geohash));
     }
+
+    /* ************************************ plus code support ************************************ */
+
+    /**
+     * This alphabet also includes "0" to preserve code length
+     */
+    final static String PLUSCODE_ALPHABET_WITH_ZERO = "023456789CFGHJMPQRVWX";
+
+    /**
+     * Maximum plus code length (without the '+' symbol) that we support
+     * 21^14 is the largest value that can fit within a long value
+     */
+    final static int PLUSCODE_MAX_LENGTH = 14;
+
+    public static String latLngToPluscode(final double lon, final double lat, final int codeLength) {
+        return new OpenLocationCode(lat, lon, codeLength).getCode();
+    }
+
+    public static long latLngToPluscodeHash(final double lon, final double lat, final int codeLength) {
+
+        // FIXME: This code might benefit from some optimization, e.g. lookup instead of .indexOf()
+        String pluscode = latLngToPluscode(lon, lat, codeLength);
+
+        long result = 0;
+        for (int i = 0; i < pluscode.length(); i++) {
+            char ch = pluscode.charAt(i);
+            if (ch == '+') continue;
+            int pos = PLUSCODE_ALPHABET_WITH_ZERO.indexOf(ch);
+            if (pos < 0) {
+                throw new IllegalArgumentException("Character '" + ch + "' is not a valid plus code");
+            }
+            result = result * PLUSCODE_ALPHABET_WITH_ZERO.length() + pos;
+        }
+        return result;
+    }
+
+    public static String decodePluscode(final long hash) {
+
+        StringBuilder result = new StringBuilder(PLUSCODE_MAX_LENGTH + 1);
+
+        long rest = hash;
+        while (rest > 0) {
+            long val = rest % PLUSCODE_ALPHABET_WITH_ZERO.length();
+            result.append(PLUSCODE_ALPHABET_WITH_ZERO.charAt((int) val));
+            rest = rest / PLUSCODE_ALPHABET_WITH_ZERO.length();
+        }
+
+        result.reverse();
+        result.insert(8, '+');
+
+        return result.toString();
+    }
+
+    /**
+     * Computes the bounding box coordinates from a given geohash
+     *
+     * @param hashcode Geohash of the defined cell
+     * @return Rectangle rectangle defining the bounding box
+     */
+    public static Rectangle bboxFromPluscode(final long hashcode) {
+        return bboxFromPluscode(decodePluscode(hashcode));
+    }
+
+    /**
+     * Computes the bounding box coordinates from a given geohash
+     *
+     * @param pluscode Geohash of the defined cell
+     * @return Rectangle rectangle defining the bounding box
+     */
+    public static Rectangle bboxFromPluscode(final String pluscode) {
+        OpenLocationCode.CodeArea area = new OpenLocationCode(pluscode).decode();
+
+        return new Rectangle(area.getSouthLatitude(), area.getNorthLatitude(),
+            area.getWestLongitude(), area.getEastLongitude());
+    }
+
 }
