@@ -19,6 +19,7 @@
 
 package org.elasticsearch.common.geo;
 
+import com.google.openlocationcode.OpenLocationCode;
 import org.apache.lucene.geo.Rectangle;
 import org.apache.lucene.spatial.prefix.tree.GeohashPrefixTree;
 import org.apache.lucene.spatial.prefix.tree.QuadPrefixTree;
@@ -39,9 +40,12 @@ import org.elasticsearch.index.fielddata.MultiGeoPointValues;
 import org.elasticsearch.index.fielddata.NumericDoubleValues;
 import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
 import org.elasticsearch.index.fielddata.SortingNumericDoubleValues;
+import org.elasticsearch.search.aggregations.bucket.geogrid.GeoHashType;
 
 import java.io.IOException;
 import java.io.InputStream;
+
+import static org.elasticsearch.common.geo.GeoHashUtils.PLUSCODE_MAX_LENGTH;
 
 public class GeoUtils {
 
@@ -517,7 +521,7 @@ public class GeoUtils {
                 // try to parse as a distance value
                 final int parsedPrecision = GeoUtils.geoHashLevelsForPrecision(precision);
                 try {
-                    return checkPrecisionRange(parsedPrecision);
+                    return checkPrecisionRange(parsedPrecision, GeoHashType.geohash);
                 } catch (IllegalArgumentException e2) {
                     // this happens when distance too small, so precision > 12. We'd like to see the original string
                     throw new IllegalArgumentException("precision too high [" + precision + "]", e2);
@@ -532,10 +536,24 @@ public class GeoUtils {
      * Returns the precision value if it is in the range and throws an IllegalArgumentException if it
      * is outside the range.
      */
-    public static int checkPrecisionRange(int precision) {
-        if ((precision < 1) || (precision > 12)) {
-            throw new IllegalArgumentException("Invalid geohash aggregation precision of " + precision
-                + ". Must be between 1 and 12.");
+    public static int checkPrecisionRange(int precision, GeoHashType type) {
+        switch (type) {
+            case geohash:
+                if ((precision < 1) || (precision > 12)) {
+                    throw new IllegalArgumentException("Invalid geohash aggregation precision of " + precision
+                        + ". Must be between 1 and 12.");
+                }
+                break;
+            case pluscode:
+                if ((precision < 4) || (precision > PLUSCODE_MAX_LENGTH) ||
+                    (precision < OpenLocationCode.CODE_PRECISION_NORMAL && precision % 2 == 1)
+                ) {
+                    throw new IllegalArgumentException("Invalid geohash pluscode aggregation precision of " + precision
+                        + ". Must be between 4 and " + PLUSCODE_MAX_LENGTH + " , and must be even if less than 8.");
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown type " + type.toString());
         }
         return precision;
     }
