@@ -358,18 +358,27 @@ public class GeoHashUtils {
     /**
      * This alphabet also includes "0" to preserve code length
      */
-    final static String PLUSCODE_ALPHABET_WITH_ZERO = "023456789CFGHJMPQRVWX";
+    private static final String PLUSCODE_ALPHABET_WITH_ZERO = "023456789CFGHJMPQRVWX";
 
     /**
      * Maximum plus code length (without the '+' symbol) that we support
      * 21^14 is the largest value that can fit within a long value
      */
-    final static int PLUSCODE_MAX_LENGTH = 14;
+    public static final int PLUSCODE_MAX_LENGTH = 14;
 
+    /**
+     * Convert latitude+longitude to the plus code of a given length
+     */
     public static String latLngToPluscode(final double lon, final double lat, final int codeLength) {
         return new OpenLocationCode(lat, lon, codeLength).getCode();
     }
 
+    /**
+     * Convert latitude+longitude to a hash value with a given precision.
+     * Internally, the hash is created by converting plus code string into a base-21 number.
+     * Plus codes use base 20, but they get appended with 0s if the precision is low.
+     * Using base-21 allows us to preserve those zeroes
+     */
     public static long latLngToPluscodeHash(final double lon, final double lat, final int codeLength) {
 
         // FIXME: This code might benefit from some optimization, e.g. lookup instead of .indexOf()
@@ -388,6 +397,9 @@ public class GeoHashUtils {
         return result;
     }
 
+    /**
+     * Decode plus code hash back into a string
+     */
     public static String decodePluscode(final long hash) {
 
         StringBuilder result = new StringBuilder(PLUSCODE_MAX_LENGTH + 1);
