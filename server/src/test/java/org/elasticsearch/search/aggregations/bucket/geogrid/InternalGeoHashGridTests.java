@@ -124,7 +124,8 @@ public class InternalGeoHashGridTests extends InternalMultiBucketAggregationTest
         case 1:
             buckets = new ArrayList<>(buckets);
             buckets.add(
-                    new InternalGeoHashGrid.Bucket(GeoHashType.geohash, randomNonNegativeLong(), randomInt(IndexWriter.MAX_DOCS), InternalAggregations.EMPTY));
+                    new InternalGeoHashGrid.Bucket(GeoHashType.geohash, randomNonNegativeLong(),
+                        randomInt(IndexWriter.MAX_DOCS), InternalAggregations.EMPTY));
             break;
         case 2:
             size = size + between(1, 10);
