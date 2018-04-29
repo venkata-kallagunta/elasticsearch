@@ -18,6 +18,7 @@
  */
 package org.elasticsearch.search.aggregations.bucket.geogrid;
 
+import com.google.openlocationcode.OpenLocationCode;
 import org.apache.lucene.document.LatLonDocValuesField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -100,7 +101,7 @@ public class GeoHashGridAggregatorTests extends AggregatorTestCase {
 
     public void testWithSeveralDocsPlusCode() throws IOException {
         int tmp = randomIntBetween(4, 12);
-        if (tmp < 8 && tmp % 2 == 1) tmp++;
+        if (tmp < OpenLocationCode.CODE_PRECISION_NORMAL && tmp % 2 == 1) tmp++;
         final int precision = tmp;
 
         int numPoints = randomIntBetween(8, 128);
