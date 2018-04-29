@@ -54,7 +54,8 @@ public class GeoHashGridParserTests extends ESTestCase {
     public void testParseOpenLocationCode() throws Exception {
         int precision = randomIntBetween(1, 12);
         XContentParser stParser = createParser(JsonXContent.jsonXContent,
-                "{\"field\":\"my_loc\", \"type\":\"pluscode\", \"precision\":\"" + precision + "\", \"size\": \"500\", \"shard_size\": \"550\"}");
+                "{\"field\":\"my_loc\", \"type\":\"pluscode\", \"precision\":\"" + precision +
+                    "\", \"size\": \"500\", \"shard_size\": \"550\"}");
         XContentParser.Token token = stParser.nextToken();
         assertSame(XContentParser.Token.START_OBJECT, token);
         // can create a factory
