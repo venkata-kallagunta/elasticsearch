@@ -54,8 +54,7 @@ public class GeoHashGridParserTests extends ESTestCase {
     public void testParseOpenLocationCode() throws Exception {
         int precision = randomIntBetween(1, 12);
         XContentParser stParser = createParser(JsonXContent.jsonXContent,
-                "{\"field\":\"my_loc\", \"type\":\"pluscode\", \"precision\":\"" + precision +
-                    "\", \"size\": \"500\", \"shard_size\": \"550\"}");
+                "{\"field\":\"my_loc\", \"type\":\"pluscode\", \"precision\":\"" + precision + "\", \"size\": \"500\", \"shard_size\": \"550\"}");
         XContentParser.Token token = stParser.nextToken();
         assertSame(XContentParser.Token.START_OBJECT, token);
         // can create a factory
@@ -112,18 +111,5 @@ public class GeoHashGridParserTests extends ESTestCase {
                 () -> GeoGridAggregationBuilder.parse("geohash_grid", stParser));
         assertThat(ExceptionsHelper.detailedMessage(e),
                 containsString("[geohash_grid] precision doesn't support values of type: VALUE_BOOLEAN"));
-    }
-
-    public void testParseErrorOnPrecisionOutOfRange() throws Exception {
-        XContentParser stParser = createParser(JsonXContent.jsonXContent, "{\"field\":\"my_loc\", \"precision\":\"13\"}");
-        XContentParser.Token token = stParser.nextToken();
-        assertSame(XContentParser.Token.START_OBJECT, token);
-        try {
-            GeoGridAggregationBuilder.parse("geohash_grid", stParser);
-            fail();
-        } catch (XContentParseException ex) {
-            assertThat(ex.getCause(), instanceOf(IllegalArgumentException.class));
-            assertEquals("Invalid geohash aggregation precision of 13. Must be between 1 and 12.", ex.getCause().getMessage());
-        }
     }
 }
